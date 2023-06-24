@@ -15,13 +15,26 @@ contract RaffleTest is Test {
     Raffle raffle;
     HelperConfig helperConfig;
 
-    uint256 entranceFee;
+    struct NetworkConfig {
+        uint256 entranceFee;
+        uint256 interval;
+        address vrfCoordinator;
+        bytes32 gasLane;
+        uint64 subscriptionId;
+        uint32 callbackGasLimit;
+        address link;
+        uint256 deployerKey;
+    }
+
+    NetworkConfig public activeNetworkConfig;
+
+    /*  uint256 entranceFee;
     uint256 interval;
     address vrfCoordinator;
     bytes32 gasLane;
     uint64 subscriptionId;
     uint32 callbackGasLimit;
-    address link;
+    address link; */
 
     address public PLAYER = makeAddr("player");
     uint256 public constant STARTING_USER_BALANCE = 10 ether;
@@ -31,13 +44,14 @@ contract RaffleTest is Test {
         (raffle, helperConfig) = deployer.run();
 
         (
-            entranceFee,
-            interval,
-            vrfCoordinator,
-            gasLane,
-            subscriptionId,
-            callbackGasLimit,
-            link
+            activeNetworkConfig.entranceFee,
+            activeNetworkConfig.interval,
+            activeNetworkConfig.vrfCoordinator,
+            activeNetworkConfig.gasLane,
+            activeNetworkConfig.subscriptionId,
+            activeNetworkConfig.callbackGasLimit,
+            activeNetworkConfig.link,
+            activeNetworkConfig.deployerKey
         ) = helperConfig.activeNetworkConfig();
 
         vm.deal(PLAYER, STARTING_USER_BALANCE);
@@ -59,7 +73,7 @@ contract RaffleTest is Test {
         //Arrange
         vm.prank(PLAYER);
         //Act
-        raffle.enterRaffle{value: entranceFee}();
+        raffle.enterRaffle{value: activeNetworkConfig.entranceFee}();
         //Assert
         assert(address(raffle.getPlayer(0)) == PLAYER);
     }
@@ -69,27 +83,27 @@ contract RaffleTest is Test {
         vm.prank(PLAYER);
         vm.expectEmit(true, false, false, false, address(raffle));
         emit EnteredRaffle(PLAYER);
-        raffle.enterRaffle{value: entranceFee}();
+        raffle.enterRaffle{value: activeNetworkConfig.entranceFee}();
     }
 
     // This test was created around the 5:14:00 mark of the video
     function testCantEnterWhenRaffleIsInCalculation() public {
         vm.prank(PLAYER);
-        raffle.enterRaffle{value: entranceFee}();
-        vm.warp(block.timestamp + interval + 1);
+        raffle.enterRaffle{value: activeNetworkConfig.entranceFee}();
+        vm.warp(block.timestamp + activeNetworkConfig.interval + 1);
         vm.roll(block.number + 1);
         raffle.performUpkeep("");
 
         vm.expectRevert(Raffle.Raffle__RaffleNotOpen.selector);
         vm.prank(PLAYER);
-        raffle.enterRaffle{value: entranceFee}();
+        raffle.enterRaffle{value: activeNetworkConfig.entranceFee}();
     }
 
     // -----------Check Upkeep Tests----------------
 
     function testCheckUpkeepReturnsFalseIfItHasNoBalance() public {
         // Arrange
-        vm.warp(block.timestamp + interval + 1);
+        vm.warp(block.timestamp + activeNetworkConfig.interval + 1);
         vm.roll(block.number + 1);
 
         // Act
@@ -102,8 +116,8 @@ contract RaffleTest is Test {
     function testCheckUpkeepReturnsFalseIfRaffleNotOpen() public {
         // Arrange
         vm.prank(PLAYER);
-        raffle.enterRaffle{value: entranceFee}();
-        vm.warp(block.timestamp + interval + 1);
+        raffle.enterRaffle{value: activeNetworkConfig.entranceFee}();
+        vm.warp(block.timestamp + activeNetworkConfig.interval + 1);
         vm.roll(block.number + 1);
 
         raffle.performUpkeep("");
@@ -117,7 +131,7 @@ contract RaffleTest is Test {
     function testCheckUpKeepReturnsFalseIfEnoughTimeHasntPassed() public {
         // Arrange and Act
         vm.prank(PLAYER);
-        raffle.enterRaffle{value: entranceFee}();
+        raffle.enterRaffle{value: activeNetworkConfig.entranceFee}();
 
         (bool upkeepNeeded, ) = raffle.checkUpkeep("");
 
@@ -128,9 +142,9 @@ contract RaffleTest is Test {
     function testCheckUpKeepReturnsTrueWhenParametersAreGood() public {
         // Arrange and Act
         vm.prank(PLAYER);
-        raffle.enterRaffle{value: entranceFee}();
+        raffle.enterRaffle{value: activeNetworkConfig.entranceFee}();
 
-        vm.warp(block.timestamp + interval + 1);
+        vm.warp(block.timestamp + activeNetworkConfig.interval + 1);
         vm.roll(block.number + 1);
 
         // Assert
@@ -145,8 +159,8 @@ contract RaffleTest is Test {
     function testPerformUpkeepCanOnlyRunIfTrue() public {
         // Arrange
         vm.prank(PLAYER);
-        raffle.enterRaffle{value: entranceFee}();
-        vm.warp(block.timestamp + interval + 1);
+        raffle.enterRaffle{value: activeNetworkConfig.entranceFee}();
+        vm.warp(block.timestamp + activeNetworkConfig.interval + 1);
         vm.roll(block.number + 1);
 
         // Act and Assert
@@ -176,8 +190,8 @@ contract RaffleTest is Test {
     modifier raffleEnteredAndTimePassed() {
         // Arrange for player enter raffle and time pass for upkeep
         vm.prank(PLAYER);
-        raffle.enterRaffle{value: entranceFee}();
-        vm.warp(block.timestamp + interval + 1);
+        raffle.enterRaffle{value: activeNetworkConfig.entranceFee}();
+        vm.warp(block.timestamp + activeNetworkConfig.interval + 1);
         vm.roll(block.number + 1);
         _;
     }
@@ -210,10 +224,11 @@ contract RaffleTest is Test {
     ) public raffleEnteredAndTimePassed {
         //Arrange
         vm.expectRevert("nonexistent request");
-        VRFCoordinatorV2Mock(vrfCoordinator).fulfillRandomWords(
-            randomRequestId, // fuzzed here to fuzz the requestId
-            address(raffle)
-        );
+        VRFCoordinatorV2Mock(activeNetworkConfig.vrfCoordinator)
+            .fulfillRandomWords(
+                randomRequestId, // fuzzed here to fuzz the requestId
+                address(raffle)
+            );
     }
 
     function testFulfillRandomWordsPicksAWinnerResetsAndSendsMoney()
@@ -233,10 +248,11 @@ contract RaffleTest is Test {
         ) {
             address player = address(uint160(i));
             hoax(player, STARTING_USER_BALANCE);
-            raffle.enterRaffle{value: entranceFee}();
+            raffle.enterRaffle{value: activeNetworkConfig.entranceFee}();
         }
 
-        uint256 prize = entranceFee * (additionalEntrants + 1); // +1 for the first player
+        uint256 prize = activeNetworkConfig.entranceFee *
+            (additionalEntrants + 1); // +1 for the first player
 
         vm.recordLogs(); // Start the recording of logs emited in this function
         raffle.performUpkeep(""); // emits requestId
@@ -246,10 +262,8 @@ contract RaffleTest is Test {
 
         uint256 previousTimeStamp = raffle.getLastTimeStamp();
 
-        VRFCoordinatorV2Mock(vrfCoordinator).fulfillRandomWords(
-            uint256(requestId),
-            address(raffle)
-        );
+        VRFCoordinatorV2Mock(activeNetworkConfig.vrfCoordinator)
+            .fulfillRandomWords(uint256(requestId), address(raffle));
 
         //Reassigning entries variable after logs  consumed.First entry should be Winner.
         entries = vm.getRecordedLogs(); //getting logs after fulfillRandomWords old logs should be gone
@@ -269,7 +283,7 @@ contract RaffleTest is Test {
         assertEq(entries[0].topics[0], keccak256("PickedWinner(address)")); // Event name should match
         assertEq(
             raffle.getWinner().balance,
-            STARTING_USER_BALANCE + prize - entranceFee
+            STARTING_USER_BALANCE + prize - activeNetworkConfig.entranceFee
         ); // Winner should have prize
     }
 
