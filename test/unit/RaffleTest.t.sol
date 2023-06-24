@@ -272,4 +272,6 @@ contract RaffleTest is Test {
             STARTING_USER_BALANCE + prize - entranceFee
         ); // Winner should have prize
     }
+
+    //left video at 6:27:00
 }

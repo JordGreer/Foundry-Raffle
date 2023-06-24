@@ -28,7 +28,7 @@ import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/interface
 import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 
 /**
- * @title A sample raffle contract
+ *
  * @author Jordan Greer
  * @notice This contract is a sample raffle contract
  * @dev Implements Chainlink VRFv2
