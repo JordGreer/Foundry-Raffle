@@ -74,6 +74,7 @@ contract Raffle is VRFConsumerBaseV2 {
 
     event EnteredRaffle(address indexed player);
     event PickedWinner(address indexed winner);
+    event RequestedRaffleWinner(uint256 indexed requestId);
 
     // Constructor
 
@@ -119,7 +120,7 @@ contract Raffle is VRFConsumerBaseV2 {
      * 4. The contract has ETH
      * 5. (Implicit)The contract has LINK
      */
-    function checkUpKeep(
+    function checkUpkeep(
         bytes memory /* checkData */
     ) public view returns (bool upkeepNeeded, bytes memory /* performsData */) {
         bool timeHasPassed = (block.timestamp - s_lastTimeStamp) >= i_interval;
@@ -138,7 +139,7 @@ contract Raffle is VRFConsumerBaseV2 {
      */
 
     function performUpkeep(bytes calldata /* performData */) external {
-        (bool upkeepNeeded, ) = checkUpKeep(""); // Make sure its time for an upkeep
+        (bool upkeepNeeded, ) = checkUpkeep(""); // Make sure its time for an upkeep
         if (!upkeepNeeded) {
             revert Raffle__UpKeepNotNeeded(
                 address(this).balance,
@@ -149,13 +150,15 @@ contract Raffle is VRFConsumerBaseV2 {
 
         s_raffleState = RaffleState.CALCULATING; // Change the raffle state to calculating
 
-        i_vrfCoordinator.requestRandomWords(
+        uint256 requestId = i_vrfCoordinator.requestRandomWords(
             i_gasLane, // gas lane
             i_subscriptionId, // id funded with link
             REQUEST_CONFIRMATIONS, // block confirmations
             i_callbackGasLimit, // gas limit for calling us back
             NUM_WORDS // number of words or 'random numbers' to return
         );
+
+        emit RequestedRaffleWinner(requestId);
     }
 
     // Internal and private functions
@@ -199,5 +202,17 @@ contract Raffle is VRFConsumerBaseV2 {
 
     function getPlayer(uint256 indexOfPlayer) external view returns (address) {
         return s_players[indexOfPlayer];
+    }
+
+    function getWinner() external view returns (address) {
+        return s_recentWinner;
+    }
+
+    function getLengthOfPlayers() external view returns (uint256) {
+        return s_players.length;
+    }
+
+    function getLastTimeStamp() external view returns (uint256) {
+        return s_lastTimeStamp;
     }
 }
